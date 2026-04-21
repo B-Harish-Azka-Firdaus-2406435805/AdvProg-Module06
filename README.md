@@ -57,3 +57,19 @@ Key changes:
 The refactoring is important because without it, every new route would require copy-pasting the full response logic. By pulling just the varying parts (`status_line` and `filename`) into a tuple, the shared logic stays in one place and is easy to extend.
 
 ![Commit 3 screen capture](hello/assets/commit3.png)
+
+---
+
+## Commit 4 Reflection Notes
+
+### Simulation of Slow Request
+
+In Milestone 4, a `/sleep` route is added that calls `thread::sleep(Duration::from_secs(10))` before responding. This simulates a slow or expensive operation.
+
+The critical problem this exposes: the server is **single-threaded**. The `for stream in listener.incoming()` loop processes one connection at a time — it calls `handle_connection`, blocks until it finishes, and only then picks up the next connection.
+
+To observe this, open two browser tabs simultaneously:
+1. Tab 1: `http://127.0.0.1:7878/sleep` — triggers the 10-second delay
+2. Tab 2: `http://127.0.0.1:7878` — tries to load the normal page
+
+Tab 2 is forced to wait the full 10 seconds even though it requested a fast page. In a real server with many users, one slow request would freeze everyone else. This motivates the move to a thread pool in Milestone 5.
