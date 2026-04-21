@@ -39,3 +39,21 @@ Key changes:
 Without `Content-Length`, browsers may hang or display nothing because they don't know when the response body ends. This is why the header is essential even for a minimal server.
 
 ![Commit 2 screen capture](hello/assets/commit2.png)
+
+---
+
+## Commit 3 Reflection Notes
+
+### Validating Request and Selectively Responding
+
+In Milestone 3, the server learns to distinguish between valid and invalid routes instead of blindly serving `hello.html` for every request.
+
+Key changes:
+
+- Instead of collecting all headers, we now only read the **first line** of the request (`request_line`) using `.lines().next()`. This first line is the HTTP request line, e.g. `GET / HTTP/1.1`, which contains the method, path, and HTTP version — everything we need to route the request.
+- A simple `if/else` checks whether the request line is exactly `"GET / HTTP/1.1"`. If it matches, we respond with `200 OK` and `hello.html`. Any other path falls through to `404 NOT FOUND` and `404.html`.
+- The refactoring extracts `(status_line, filename)` as a tuple from the conditional, then reuses the same response-building and writing logic below. This avoids duplicating the `format!` and `write_all` calls for each branch — a clean separation between *deciding* the response and *sending* it.
+
+The refactoring is important because without it, every new route would require copy-pasting the full response logic. By pulling just the varying parts (`status_line` and `filename`) into a tuple, the shared logic stays in one place and is easy to extend.
+
+![Commit 3 screen capture](hello/assets/commit3.png)
