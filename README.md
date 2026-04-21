@@ -73,3 +73,21 @@ To observe this, open two browser tabs simultaneously:
 2. Tab 2: `http://127.0.0.1:7878` — tries to load the normal page
 
 Tab 2 is forced to wait the full 10 seconds even though it requested a fast page. In a real server with many users, one slow request would freeze everyone else. This motivates the move to a thread pool in Milestone 5.
+
+---
+
+## Commit 5 Reflection Notes
+
+### Multithreaded Server using ThreadPool
+
+In Milestone 5, the server becomes multithreaded by introducing a `ThreadPool` defined in `src/lib.rs`.
+
+**How ThreadPool works:**
+
+- `ThreadPool::new(size)` spawns `size` worker threads upfront and creates an `mpsc` channel. The channel's `Receiver` is wrapped in `Arc<Mutex<...>>` so it can be safely shared across threads — `Arc` allows multiple owners, `Mutex` ensures only one thread receives a job at a time.
+- Each `Worker` runs a loop: it locks the receiver, waits for a `Job` message, executes it, then loops back. The lock is released after `.recv()` returns, so other workers can compete for the next job.
+- `ThreadPool::execute` sends a closure (boxed as a `Job`) through the channel. Whichever worker is free picks it up immediately.
+- The `Drop` implementation gracefully shuts down: it drops the `Sender` (closing the channel), which causes all workers' `.recv()` calls to return `Err`, breaking their loops. Then it joins each thread to wait for in-flight jobs to finish.
+
+**Why this fixes the slow request problem:**  
+Now each incoming connection is handed off to a worker thread via `pool.execute(|| { handle_connection(stream); })`. The main thread returns to `listener.incoming()` immediately. A `/sleep` request blocks its worker thread, but the other 3 workers remain free to handle new connections concurrently.
