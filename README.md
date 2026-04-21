@@ -91,3 +91,24 @@ In Milestone 5, the server becomes multithreaded by introducing a `ThreadPool` d
 
 **Why this fixes the slow request problem:**  
 Now each incoming connection is handed off to a worker thread via `pool.execute(|| { handle_connection(stream); })`. The main thread returns to `listener.incoming()` immediately. A `/sleep` request blocks its worker thread, but the other 3 workers remain free to handle new connections concurrently.
+
+---
+
+## Commit Bonus Reflection Notes
+
+### `build` vs `new` — Function Improvement
+
+The bonus adds a `ThreadPool::build(size: usize) -> Result<ThreadPool, PoolCreationError>` function as a safer alternative to `new`.
+
+**The difference:**
+
+| | `new` | `build` |
+|---|---|---|
+| Invalid input (`size == 0`) | Panics via `assert!` | Returns `Err(PoolCreationError(...))` |
+| Return type | `ThreadPool` | `Result<ThreadPool, PoolCreationError>` |
+| Caller error handling | None — crash is the only outcome | Caller decides: log, retry, exit gracefully |
+
+**Why `build` is better in production code:**  
+`new` by Rust convention implies the operation always succeeds. When it can fail (e.g. size of 0 is invalid, or resource allocation could fail), panicking is poor API design — it gives the caller no chance to recover or show a meaningful error message. `build` follows the pattern used by standard library types like `String::from_utf8` that return `Result` when construction can fail.
+
+The `PoolCreationError` wrapper type (implementing `Display`) gives callers a descriptive error message and allows the error to propagate naturally through `?` in a `main` that returns `Result`.
